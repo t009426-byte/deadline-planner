@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "deadline-planner",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "deadline-planner", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}
