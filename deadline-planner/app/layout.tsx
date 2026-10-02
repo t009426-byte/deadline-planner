@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Work_Sans, Tajawal } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "./lib/i18n";
@@ -23,9 +23,19 @@ const arabicFont = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "Family Command Hub — Calm Productivity for Busy Families",
-  description:
-    "The family command center that balances professional-grade scheduling with a warm, domestic soul.",
+  title: "Family Hub",
+  description: "Family calendar, homework, tests and daily tasks for a busy studying mom.",
+  applicationName: "Family Hub",
+  appleWebApp: { capable: true, title: "Family Hub", statusBarStyle: "default" },
+  formatDetection: { telephone: false },
+  other: { "apple-mobile-web-app-capable": "yes" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#005764",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

@@ -1,7 +1,5 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
-
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+import { SUPABASE_KEY as KEY, SUPABASE_URL as URL } from "./supabase-config";
 const serverAuth = { persistSession: false, autoRefreshToken: false };
 
 export function anonClient() {

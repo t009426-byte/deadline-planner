@@ -40,7 +40,7 @@ export default function AuthScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <div className="flex justify-end p-4">
         <button
           onClick={toggleLocale}

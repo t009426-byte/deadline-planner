@@ -4,6 +4,7 @@ import { useState } from "react";
 import FamilyCalendar from "./components/FamilyCalendar";
 import FamilyProfile from "./components/FamilyProfile";
 import AuthScreen from "./components/AuthScreen";
+import InstallHint from "./components/InstallHint";
 import Routines from "./components/Routines";
 import Wellbeing from "./components/Wellbeing";
 import { useLanguage } from "./lib/i18n";
@@ -72,7 +73,7 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background w-full">
-      <header className="bg-background/95 backdrop-blur sticky top-0 z-50 border-b border-surface-container">
+      <header className="bg-background/95 backdrop-blur sticky top-0 z-50 border-b border-surface-container pt-[env(safe-area-inset-top)]">
         <div className="max-w-3xl mx-auto flex justify-between items-center px-4 h-14">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
@@ -124,7 +125,8 @@ function Dashboard() {
         )}
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 pb-24 md:pb-10 space-y-8 pt-6">
+      <main className="max-w-3xl mx-auto px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-10 space-y-8 pt-6">
+        <InstallHint />
         <section id="calendar" className="scroll-mt-28">
           <div className="flex items-center justify-between mb-3">
             <SectionLabel icon="calendar_today" label={t.sections.calendar.title} />
@@ -148,7 +150,7 @@ function Dashboard() {
         </section>
       </main>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-surface-container flex">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-surface-container flex pb-[env(safe-area-inset-bottom)]">
         {navItems.map((n) => (
           <a
             key={n.href}

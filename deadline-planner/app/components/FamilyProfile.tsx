@@ -52,7 +52,7 @@ export default function FamilyProfile({ open, onClose }: { open: boolean; onClos
           </button>
         </div>
 
-        <div className="p-5 space-y-6">
+        <div className="p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-6">
           <section className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-outline">
               {isAr ? "أنا (المسؤولة)" : "Me (Admin)"}
