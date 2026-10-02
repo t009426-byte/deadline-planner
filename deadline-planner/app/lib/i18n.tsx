@@ -27,7 +27,7 @@ export const translations = {
       clashText: "Leo's Soccer Practice overlaps with Maya's Violin Recital. Both require transportation from different locations.",
       briefTitle: "Your Next 48 Hours",
       briefText:
-        "Good morning! You have a busy Tuesday ahead, primarily focused on afternoon logistics. While the morning is clear for deep work, three school activities converge after 3:00 PM, including a transit conflict I've flagged above. Tomorrow looks much lighter, with just a morning parent-teacher sync and your usual gym block at noon.",
+        "Good morning! Your study block (9–11 AM, Thesis Ch. 3) is protected this morning — no conflicts before noon. Three school pickups converge after 3 PM, including the transport clash above. Your literature review is due Thursday, so today's focus window matters. Tomorrow is lighter — a good catch-up window if needed.",
       events: "5 Events",
       conflict: "1 Conflict",
       assistant: "Family Assistant",
@@ -138,7 +138,7 @@ export const translations = {
       clashText: "تدريب كرة القدم لـ ليو يتعارض مع حفل عزف الكمان لـ مايا. كلاهما يحتاج إلى توصيل من موقعين مختلفين.",
       briefTitle: "الـ48 ساعة المقبلة",
       briefText:
-        "صباح الخير! أمامك يوم ثلاثاء مزدحم يتركز بشكل أساسي على لوجستيات بعد الظهر. الصباح خالٍ ومناسب للعمل المركّز، لكن ثلاث أنشطة مدرسية تتقاطع بعد الساعة 3:00 مساءً، بما فيها تعارض النقل المذكور أعلاه. يوم الغد أخف بكثير، مع اجتماع صباحي مع المعلمين وموعد النادي الرياضي المعتاد عند الظهر.",
+        "صباح الخير! وقت الدراسة (9–11 ص، الفصل الثالث من الأطروحة) محمي هذا الصباح — لا تعارضات قبل الظهر. ثلاثة مواصلات مدرسية تتقاطع بعد الساعة 3 مساءً بما فيها التعارض المذكور أعلاه. موعد تسليم مراجعة الأدبيات هو الخميس، لذا نافذة التركيز اليوم مهمة. الغد أخف — فرصة جيدة للاستدراك إن احتجتِ.",
       events: "5 أحداث",
       conflict: "تعارض واحد",
       assistant: "مساعد العائلة",

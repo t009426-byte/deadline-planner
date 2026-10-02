@@ -3,196 +3,209 @@
 import { useState } from "react";
 import { useLanguage } from "../lib/i18n";
 
-const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+interface Task {
+  id: string;
+  label: string;
+  note?: string;
+  urgent?: boolean;
+}
 
-const meta = [
-  { id: "morning-mindfulness", streak: 12, streakKind: "dayStreak" as const, accent: "var(--color-primary)", activeDays: [true, true, true, true, true, false, false], done: false },
-  { id: "deep-work", streak: 5, streakKind: "dayStreak" as const, accent: "var(--color-primary)", activeDays: [true, true, true, true, true, false, false], done: true },
-  { id: "teeth-face", streak: 22, streakKind: "starStreak" as const, accent: "var(--color-tertiary)", activeDays: [true, true, true, true, true, true, true], icon: "brush", done: false },
-  { id: "reading-time", streak: 8, streakKind: "starStreak" as const, accent: "var(--color-secondary)", activeDays: [true, true, true, true, true, true, true], icon: "menu_book", done: true },
+interface KidTask {
+  id: string;
+  name: string;
+  label: string;
+  note?: string;
+  color: string;
+}
+
+const MY_TASKS: Task[] = [
+  { id: "study", label: "Study block", note: "9–11 AM · Thesis Ch. 3", urgent: true },
+  { id: "mindful", label: "Morning mindfulness", note: "10 min" },
+  { id: "emails", label: "Work emails", note: "30 min" },
+  { id: "readings", label: "Research readings", note: "Due this week" },
 ];
 
-const weeklyMeta = [
-  { icon: "shopping_basket", accent: "var(--color-primary)" },
-  { icon: "local_library", accent: "var(--color-tertiary)" },
+const KID_TASKS: KidTask[] = [
+  { id: "oliver", name: "Oliver", label: "Soccer practice", note: "4:00 PM", color: "#005764" },
+  { id: "maya", name: "Maya", label: "Violin lesson", note: "5:00 PM", color: "#8e4e14" },
+  { id: "leo", name: "Leo", label: "Homework review", note: "After school", color: "#8e2e15" },
+];
+
+const WEEKLY: Array<{ label: string; due: string; urgent?: boolean }> = [
+  { label: "Submit literature review", due: "Thu", urgent: true },
+  { label: "Parent-teacher meeting", due: "Fri" },
+  { label: "Grocery + meal prep", due: "Sun" },
 ];
 
 export default function Routines() {
-  const { t } = useLanguage();
-  const c = t.routinesCard;
-  const [done, setDone] = useState<Record<string, boolean>>(
-    Object.fromEntries(meta.map((m) => [m.id, m.done]))
-  );
+  const { locale } = useLanguage();
+  const isAr = locale === "ar";
 
-  function toggle(id: string) {
-    setDone((d) => ({ ...d, [id]: !d[id] }));
-  }
+  const [myDone, setMyDone] = useState<Record<string, boolean>>({});
+  const [kidDone, setKidDone] = useState<Record<string, boolean>>({});
 
-  const routines = c.routines.map((r, i) => ({ ...r, ...meta[i] }));
-  const mine = routines.filter((r) => !("owner" in r) || !r.owner);
-  const kids = routines.filter((r) => "owner" in r && r.owner);
-
-  function RoutineCard({ routine }: { routine: (typeof routines)[number] }) {
-    const isDone = done[routine.id];
-    const streakLabel = routine.streakKind === "starStreak" ? c.starStreak : c.dayStreak;
-    return (
-      <div className="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(42,111,125,0.08)] flex flex-col justify-between h-full">
-        <div className="space-y-2">
-          <div className="flex justify-between items-start gap-3">
-            <div className="flex items-start gap-3">
-              {routine.icon && (
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: `${routine.accent}1f` }}
-                >
-                  <span className="material-symbols-outlined" style={{ color: routine.accent }}>
-                    {routine.icon}
-                  </span>
-                </div>
-              )}
-              <div>
-                <h4
-                  className="font-heading text-lg font-semibold"
-                  style={{ color: routine.icon ? "var(--color-on-surface)" : routine.accent }}
-                >
-                  {routine.title}
-                </h4>
-                <p className="text-sm text-on-surface-variant">{routine.subtitle}</p>
-              </div>
-            </div>
-            <div
-              className="flex items-center gap-1 px-3 py-1 rounded-full shrink-0"
-              style={{ backgroundColor: `${routine.accent}30` }}
-            >
-              <span
-                className="material-symbols-outlined text-[16px]"
-                style={{ color: routine.accent, fontVariationSettings: "'FILL' 1" }}
-              >
-                {routine.streakKind === "starStreak" ? "star" : "local_fire_department"}
-              </span>
-              <span className="text-xs font-semibold" style={{ color: routine.accent }}>
-                {routine.streak} {streakLabel}
-              </span>
-            </div>
-          </div>
-          <div className="flex gap-2 pt-2">
-            {DAYS.map((d, i) => (
-              <span
-                key={i}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
-                style={
-                  routine.activeDays[i]
-                    ? { backgroundColor: routine.accent, color: "white" }
-                    : { backgroundColor: "var(--color-surface-container-high)", color: "var(--color-on-surface-variant)" }
-                }
-              >
-                {d}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="mt-4 flex items-center justify-between border-t border-outline-variant pt-3">
-          <span className="text-sm text-on-surface-variant italic">
-            {"owner" in routine && routine.owner ? routine.owner : c.resetsDaily}
-          </span>
-          <button
-            onClick={() => toggle(routine.id)}
-            className="w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all"
-            style={
-              isDone
-                ? { backgroundColor: routine.accent, borderColor: routine.accent }
-                : { borderColor: "var(--color-outline-variant)" }
-            }
-          >
-            <span className={`material-symbols-outlined text-[18px] text-white ${isDone ? "opacity-100" : "opacity-0"}`}>
-              check
-            </span>
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const myCompleted = Object.values(myDone).filter(Boolean).length;
+  const kidCompleted = Object.values(kidDone).filter(Boolean).length;
 
   return (
-    <div className="space-y-stack-lg">
-      <div>
-        <h3 className="font-heading text-2xl font-bold text-primary">{c.title}</h3>
-        <p className="text-on-surface-variant text-lg">{c.subtitle}</p>
+    <div className="space-y-4">
+      {/* Section label */}
+      <div className="flex items-center gap-1.5">
+        <span className="material-symbols-outlined text-outline text-[16px]">checklist</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-outline">
+          {isAr ? "مهام اليوم" : "Today's Tasks"}
+        </span>
       </div>
 
-      <div className="space-y-stack-md">
-        <div className="flex items-center justify-between">
+      {/* My tasks */}
+      <div className="bg-surface-container-lowest rounded-xl border border-surface-container overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-container">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">person</span>
-            <h4 className="font-heading text-xl font-semibold text-on-surface">{c.myRoutines}</h4>
-          </div>
-          <button className="bg-primary-container text-on-primary-container px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 hover:opacity-90 transition-all">
-            <span className="material-symbols-outlined text-[18px]">add</span> {c.addNew}
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-          {mine.map((r) => (
-            <RoutineCard key={r.id} routine={r} />
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-stack-md pt-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-tertiary">family_restroom</span>
-            <h4 className="font-heading text-xl font-semibold text-on-surface">{c.kidsRoutines}</h4>
-          </div>
-          <div className="flex gap-2">
-            <span className="px-3 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant text-xs font-semibold">
-              {c.kidTags[0]}
+            <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              school
             </span>
-            <span className="px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant text-xs font-semibold">
-              {c.kidTags[1]}
+            <span className="font-semibold text-sm text-on-surface">
+              {isAr ? "يومي" : "My Day"}
             </span>
           </div>
+          <span className="text-xs text-outline">
+            {myCompleted}/{MY_TASKS.length}
+          </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-          {kids.map((r) => (
-            <RoutineCard key={r.id} routine={r} />
-          ))}
-        </div>
+        <ul>
+          {MY_TASKS.map((task, i) => {
+            const done = !!myDone[task.id];
+            return (
+              <li
+                key={task.id}
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-container transition-colors ${
+                  i < MY_TASKS.length - 1 ? "border-b border-surface-container" : ""
+                }`}
+                onClick={() => setMyDone((d) => ({ ...d, [task.id]: !d[task.id] }))}
+              >
+                <button
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                    done
+                      ? "bg-primary border-primary"
+                      : task.urgent
+                      ? "border-primary"
+                      : "border-outline-variant"
+                  }`}
+                >
+                  {done && (
+                    <span className="material-symbols-outlined text-white text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      check
+                    </span>
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <span className={`text-sm font-medium leading-tight block ${done ? "line-through text-outline" : "text-on-surface"}`}>
+                    {task.label}
+                    {task.urgent && !done && (
+                      <span className="ms-1.5 text-[10px] font-bold text-primary align-middle">●</span>
+                    )}
+                  </span>
+                  {task.note && (
+                    <span className="text-xs text-outline">{task.note}</span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
-      <div className="space-y-stack-md pt-2">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">event_repeat</span>
-          <h4 className="font-heading text-xl font-semibold text-on-surface">{c.weeklyMilestones}</h4>
+      {/* Kids tasks */}
+      <div className="bg-surface-container-lowest rounded-xl border border-surface-container overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-container">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]" style={{ color: "#8e4e14", fontVariationSettings: "'FILL' 1" }}>
+              family_restroom
+            </span>
+            <span className="font-semibold text-sm text-on-surface">
+              {isAr ? "الأطفال" : "Kids"}
+            </span>
+          </div>
+          <span className="text-xs text-outline">
+            {kidCompleted}/{KID_TASKS.length}
+          </span>
         </div>
-        <div className="bg-surface-container p-6 rounded-2xl space-y-4">
-          {c.weeklyItems.map((w, i) => (
-            <div
-              key={w.title}
-              className="flex items-center gap-4 bg-surface-container-lowest p-4 rounded-xl shadow-sm border-s-4"
-              style={{ borderColor: weeklyMeta[i].accent }}
+        <ul>
+          {KID_TASKS.map((task, i) => {
+            const done = !!kidDone[task.id];
+            return (
+              <li
+                key={task.id}
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-container transition-colors ${
+                  i < KID_TASKS.length - 1 ? "border-b border-surface-container" : ""
+                }`}
+                onClick={() => setKidDone((d) => ({ ...d, [task.id]: !d[task.id] }))}
+              >
+                <button
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                    done ? "border-[color:var(--c)] bg-[color:var(--c)]" : "border-outline-variant"
+                  }`}
+                  style={{ "--c": task.color } as React.CSSProperties}
+                >
+                  {done && (
+                    <span className="material-symbols-outlined text-white text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      check
+                    </span>
+                  )}
+                </button>
+                <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                  <span
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                    style={{ color: task.color, backgroundColor: `${task.color}15` }}
+                  >
+                    {task.name}
+                  </span>
+                  <span className={`text-sm font-medium ${done ? "line-through text-outline" : "text-on-surface"}`}>
+                    {task.label}
+                  </span>
+                  {task.note && (
+                    <span className="text-xs text-outline ms-auto shrink-0">{task.note}</span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {/* Weekly upcoming */}
+      <div className="bg-surface-container-lowest rounded-xl border border-surface-container overflow-hidden">
+        <div className="px-4 py-3 border-b border-surface-container">
+          <span className="font-semibold text-sm text-on-surface">
+            {isAr ? "هذا الأسبوع" : "Coming up"}
+          </span>
+        </div>
+        <ul>
+          {WEEKLY.map((item, i) => (
+            <li
+              key={item.label}
+              className={`flex items-center gap-3 px-4 py-3 ${i < WEEKLY.length - 1 ? "border-b border-surface-container" : ""}`}
             >
-              <div
-                className="shrink-0 w-12 h-12 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: `${weeklyMeta[i].accent}1f` }}
-              >
-                <span className="material-symbols-outlined" style={{ color: weeklyMeta[i].accent }}>
-                  {weeklyMeta[i].icon}
-                </span>
-              </div>
-              <div className="flex-grow">
-                <h5 className="font-heading text-lg font-semibold text-on-surface">{w.title}</h5>
-                <p className="text-sm text-on-surface-variant">{w.subtitle}</p>
-              </div>
               <span
-                className="text-xs font-semibold px-2 py-0.5 rounded"
-                style={{ color: weeklyMeta[i].accent, backgroundColor: `${weeklyMeta[i].accent}1f` }}
+                className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${
+                  item.urgent
+                    ? "bg-primary/10 text-primary"
+                    : "bg-surface-container text-outline"
+                }`}
               >
-                {w.tag}
+                {item.due}
               </span>
-            </div>
+              <span className={`text-sm ${item.urgent ? "font-semibold text-on-surface" : "text-on-surface-variant"}`}>
+                {item.label}
+              </span>
+              {item.urgent && (
+                <span className="ms-auto material-symbols-outlined text-primary text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  priority_high
+                </span>
+              )}
+            </li>
           ))}
-        </div>
-        <p className="text-center text-sm text-on-surface-variant italic pt-2">{c.weeklyFooter}</p>
+        </ul>
       </div>
     </div>
   );
