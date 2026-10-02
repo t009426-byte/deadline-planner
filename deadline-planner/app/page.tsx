@@ -3,6 +3,7 @@
 import { useState } from "react";
 import FamilyCalendar from "./components/FamilyCalendar";
 import FamilyProfile from "./components/FamilyProfile";
+import AuthScreen from "./components/AuthScreen";
 import Routines from "./components/Routines";
 import Wellbeing from "./components/Wellbeing";
 import { useLanguage } from "./lib/i18n";
@@ -40,8 +41,29 @@ function TodayBar() {
 }
 
 export default function Home() {
+  const { authReady, session, ready, loadError } = useFamily();
+  if (!authReady) return <Splash />;
+  if (!session) return <AuthScreen />;
+  if (!ready) return <Splash message={loadError} />;
+  return <Dashboard />;
+}
+
+function Splash({ message }: { message?: string | null }) {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center">
+      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center animate-pulse">
+        <span className="material-symbols-outlined text-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+          home
+        </span>
+      </div>
+      {message && <p className="text-sm text-error max-w-xs">{message}</p>}
+    </div>
+  );
+}
+
+function Dashboard() {
   const { t, locale, toggleLocale } = useLanguage();
-  const { admin, isNew } = useFamily();
+  const { admin, isNew, syncError } = useFamily();
   const isAr = locale === "ar";
   const [userOpen, setProfileOpen] = useState<boolean | null>(null);
   const profileOpen = userOpen ?? isNew;
@@ -95,6 +117,11 @@ export default function Home() {
           </div>
         </div>
         <TodayBar />
+        {syncError && (
+          <div className="bg-error-container text-on-error-container text-xs px-4 py-2 text-center">
+            {isAr ? "تعذّر حفظ آخر تغيير — تم تحديث البيانات من الخادم." : "Couldn't save the last change — reloaded from the server."}
+          </div>
+        )}
       </header>
 
       <main className="max-w-3xl mx-auto px-4 pb-24 md:pb-10 space-y-8 pt-6">

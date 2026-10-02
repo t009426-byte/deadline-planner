@@ -4,29 +4,24 @@ import { useState } from "react";
 import { useLanguage } from "../lib/i18n";
 import { ENTRY_TYPES, fromDateKey, memberLabel, toDateKey, useFamily } from "../lib/family";
 
-interface Task {
-  id: string;
-  label: string;
-  note?: string;
-  urgent?: boolean;
-}
-
-const MY_TASKS: Task[] = [
-  { id: "study", label: "Study block", note: "9–11 AM · Thesis Ch. 3", urgent: true },
-  { id: "mindful", label: "Morning mindfulness", note: "10 min" },
-  { id: "emails", label: "Work emails", note: "30 min" },
-  { id: "readings", label: "Research readings", note: "Due this week" },
-];
-
 const typeMeta = Object.fromEntries(ENTRY_TYPES.map((t) => [t.id, t]));
 
 export default function Routines() {
   const { locale } = useLanguage();
   const isAr = locale === "ar";
-  const { members, entries, toggleEntry } = useFamily();
+  const { members, entries, toggleEntry, tasks, addTask, removeTask, toggleTask } = useFamily();
 
-  const [myDone, setMyDone] = useState<Record<string, boolean>>({});
-  const myCompleted = Object.values(myDone).filter(Boolean).length;
+  const [newLabel, setNewLabel] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const myCompleted = tasks.filter((t) => t.done).length;
+
+  function submitTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newLabel.trim()) return;
+    addTask(newLabel.trim(), newNote.trim() || undefined);
+    setNewLabel("");
+    setNewNote("");
+  }
 
   const memberById = Object.fromEntries(members.map((m) => [m.id, m]));
   const todayKey = toDateKey(new Date());
@@ -67,50 +62,68 @@ export default function Routines() {
             </span>
           </div>
           <span className="text-xs text-outline">
-            {myCompleted}/{MY_TASKS.length}
+            {myCompleted}/{tasks.length}
           </span>
         </div>
         <ul>
-          {MY_TASKS.map((task, i) => {
-            const done = !!myDone[task.id];
-            return (
-              <li
-                key={task.id}
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-container transition-colors ${
-                  i < MY_TASKS.length - 1 ? "border-b border-surface-container" : ""
+          {tasks.map((task) => (
+            <li
+              key={task.id}
+              className="group flex items-center gap-3 ps-4 pe-2 py-3 cursor-pointer hover:bg-surface-container transition-colors border-b border-surface-container"
+              onClick={() => toggleTask(task.id)}
+            >
+              <span
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  task.done ? "bg-primary border-primary" : "border-outline-variant"
                 }`}
-                onClick={() => setMyDone((d) => ({ ...d, [task.id]: !d[task.id] }))}
               >
-                <button
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                    done
-                      ? "bg-primary border-primary"
-                      : task.urgent
-                      ? "border-primary"
-                      : "border-outline-variant"
-                  }`}
-                >
-                  {done && (
-                    <span className="material-symbols-outlined text-white text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      check
-                    </span>
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <span className={`text-sm font-medium leading-tight block ${done ? "line-through text-outline" : "text-on-surface"}`}>
-                    {task.label}
-                    {task.urgent && !done && (
-                      <span className="ms-1.5 text-[10px] font-bold text-primary align-middle">●</span>
-                    )}
+                {task.done && (
+                  <span className="material-symbols-outlined text-white text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    check
                   </span>
-                  {task.note && (
-                    <span className="text-xs text-outline">{task.note}</span>
-                  )}
-                </div>
-              </li>
-            );
-          })}
+                )}
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className={`text-sm font-medium leading-tight block ${task.done ? "line-through text-outline" : "text-on-surface"}`}>
+                  {task.label}
+                </span>
+                {task.note && <span className="text-xs text-outline">{task.note}</span>}
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeTask(task.id);
+                }}
+                aria-label={isAr ? "حذف المهمة" : "Delete task"}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/50 shrink-0 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+              </button>
+            </li>
+          ))}
         </ul>
+        <form onSubmit={submitTask} className="flex items-center gap-2 p-2">
+          <input
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            placeholder={isAr ? "أضيفي مهمة…" : "Add a task…"}
+            className="flex-1 min-w-0 bg-surface-container rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <input
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder={isAr ? "الوقت" : "Time/note"}
+            className="w-24 bg-surface-container rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <button
+            type="submit"
+            disabled={!newLabel.trim()}
+            aria-label={isAr ? "إضافة مهمة" : "Add task"}
+            className="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center shrink-0 disabled:opacity-40 hover:opacity-90 transition-opacity"
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+          </button>
+        </form>
       </div>
 
       {/* Next 7 days from the family calendar */}

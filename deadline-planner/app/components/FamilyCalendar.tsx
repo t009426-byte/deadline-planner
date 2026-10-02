@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "../lib/i18n";
+import { authFetch } from "../lib/supabase";
+import type { ExternalEvent } from "../lib/external-calendars";
 import {
   ENTRY_TYPES,
   fromDateKey,
@@ -36,7 +38,7 @@ export default function FamilyCalendar({ onOpenProfile }: { onOpenProfile: () =>
   const { locale } = useLanguage();
   const isAr = locale === "ar";
   const dateLocale = isAr ? "ar" : "en";
-  const { members, kids, entries, addEntry, removeEntry, toggleEntry } = useFamily();
+  const { members, kids, admin, entries, addEntry, removeEntry, toggleEntry, calendarsVersion } = useFamily();
 
   const todayKey = toDateKey(new Date());
   const [view, setView] = useState<View>("month");
@@ -89,6 +91,41 @@ export default function FamilyCalendar({ onOpenProfile }: { onOpenProfile: () =>
       : `${weekStart.toLocaleDateString(dateLocale, { month: "short", day: "numeric" })} – ${weekDays[6].toLocaleDateString(dateLocale, { month: "short", day: "numeric" })}`;
 
   const selectedEntries = entriesOn(date);
+
+  const rangeFrom = toDateKey(view === "month" ? monthDays[0] : weekDays[0]);
+  const rangeTo = toDateKey(view === "month" ? monthDays[monthDays.length - 1] : weekDays[6]);
+  const rangeKey = `${rangeFrom}|${rangeTo}|${calendarsVersion}`;
+  const [external, setExternal] = useState<{
+    key: string;
+    events: ExternalEvent[];
+    errors: Record<string, string>;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    authFetch(`/api/calendar/external?from=${rangeFrom}&to=${rangeTo}`)
+      .then((r) => (r.ok ? r.json() : { events: [], errors: {} }))
+      .then((json) => !cancelled && setExternal({ key: rangeKey, events: json.events ?? [], errors: json.errors ?? {} }))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [rangeKey, rangeFrom, rangeTo]);
+
+  const showExternal = !filter || filter === admin.id;
+  const externalByDay = new Map<string, ExternalEvent[]>();
+  if (showExternal && external) {
+    for (const ev of external.events) {
+      for (const k of externalDayKeys(ev)) {
+        const list = externalByDay.get(k) ?? [];
+        list.push(ev);
+        externalByDay.set(k, list);
+      }
+    }
+    for (const list of externalByDay.values()) list.sort((a, b) => a.start.localeCompare(b.start));
+  }
+  const externalOn = (key: string) => externalByDay.get(key) ?? [];
+  const externalErrors = external ? Object.values(external.errors) : [];
 
   return (
     <div className="space-y-4">
@@ -260,8 +297,10 @@ export default function FamilyCalendar({ onOpenProfile }: { onOpenProfile: () =>
                 const isToday = key === todayKey;
                 const isSelected = key === date;
                 const dayEntries = entriesOn(key);
+                const dayExternal = externalOn(key);
                 const shown = dayEntries.slice(0, 3);
-                const more = dayEntries.length - shown.length;
+                const shownExternal = dayExternal.slice(0, Math.max(0, 3 - shown.length));
+                const more = dayEntries.length + dayExternal.length - shown.length - shownExternal.length;
                 return (
                   <button
                     key={key}
@@ -296,6 +335,16 @@ export default function FamilyCalendar({ onOpenProfile }: { onOpenProfile: () =>
                         </span>
                       );
                     })}
+                    {shownExternal.map((ev) => (
+                      <span
+                        key={ev.id}
+                        className="flex items-center justify-center md:justify-start gap-0.5 rounded px-0.5 md:px-1 py-px text-[10px] font-semibold leading-tight truncate bg-surface-container-high text-on-surface-variant"
+                        title={`${ev.title} — ${sourceLabel(ev.source, isAr)}`}
+                      >
+                        <span className="material-symbols-outlined text-[12px] shrink-0">{sourceIcon(ev.source)}</span>
+                        <span className="hidden md:inline truncate">{ev.title}</span>
+                      </span>
+                    ))}
                     {more > 0 && (
                       <span className="text-[10px] font-semibold text-outline text-center md:text-start">+{more}</span>
                     )}
@@ -310,7 +359,10 @@ export default function FamilyCalendar({ onOpenProfile }: { onOpenProfile: () =>
             <p className="text-xs font-semibold text-outline px-1">
               {fromDateKey(date).toLocaleDateString(dateLocale, { weekday: "long", month: "long", day: "numeric" })}
             </p>
-            {selectedEntries.length === 0 ? (
+            {externalOn(date).map((ev) => (
+              <ExternalRow key={ev.id} event={ev} isAr={isAr} dateLocale={dateLocale} />
+            ))}
+            {selectedEntries.length === 0 && externalOn(date).length === 0 ? (
               <p className="text-sm text-outline px-1 pb-1">
                 {isAr ? "لا شيء في هذا اليوم — أضيفي من الأعلى." : "Nothing on this day — add one above."}
               </p>
@@ -335,6 +387,7 @@ export default function FamilyCalendar({ onOpenProfile }: { onOpenProfile: () =>
             const key = toDateKey(d);
             const isToday = key === todayKey;
             const dayEntries = entriesOn(key);
+            const dayExternal = externalOn(key);
             return (
               <div
                 key={key}
@@ -355,7 +408,10 @@ export default function FamilyCalendar({ onOpenProfile }: { onOpenProfile: () =>
                   </p>
                 </button>
                 <div className="flex-1 min-w-0 flex flex-col gap-1.5 justify-center">
-                  {dayEntries.length === 0 ? (
+                  {dayExternal.map((ev) => (
+                    <ExternalRow key={ev.id} event={ev} isAr={isAr} dateLocale={dateLocale} />
+                  ))}
+                  {dayEntries.length === 0 && dayExternal.length === 0 ? (
                     <span className="text-xs text-outline-variant">—</span>
                   ) : (
                     dayEntries.map((e) => (
@@ -375,6 +431,51 @@ export default function FamilyCalendar({ onOpenProfile }: { onOpenProfile: () =>
           })}
         </div>
       )}
+
+      {externalErrors.length > 0 && (
+        <div className="text-xs text-on-error-container bg-error-container rounded-lg px-3 py-2 space-y-0.5">
+          {externalErrors.map((m) => (
+            <p key={m}>{m}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function externalDayKeys(ev: ExternalEvent): string[] {
+  const start = ev.allDay ? fromDateKey(ev.start) : new Date(ev.start);
+  const lastKey = ev.allDay
+    ? toDateKey(addDays(fromDateKey(ev.end), -1))
+    : toDateKey(new Date(Math.max(new Date(ev.end).getTime() - 1, start.getTime())));
+  const keys: string[] = [];
+  let d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  while (toDateKey(d) <= lastKey && keys.length < 62) {
+    keys.push(toDateKey(d));
+    d = addDays(d, 1);
+  }
+  return keys.length ? keys : [toDateKey(start)];
+}
+
+function sourceIcon(source: ExternalEvent["source"]) {
+  return source === "icloud" ? "phone_iphone" : "video_call";
+}
+
+function sourceLabel(source: ExternalEvent["source"], isAr: boolean) {
+  if (source === "icloud") return isAr ? "آيفون" : "iPhone";
+  return isAr ? "تيمز" : "Teams";
+}
+
+function ExternalRow({ event: ev, isAr, dateLocale }: { event: ExternalEvent; isAr: boolean; dateLocale: string }) {
+  const time = ev.allDay
+    ? isAr ? "طوال اليوم" : "All day"
+    : new Date(ev.start).toLocaleTimeString(dateLocale, { hour: "numeric", minute: "2-digit" });
+  return (
+    <div className="flex items-center gap-2 rounded-lg ps-2 pe-2 py-1.5 border-s-4 border-outline-variant bg-surface-container">
+      <span className="material-symbols-outlined text-[16px] shrink-0 text-on-surface-variant">{sourceIcon(ev.source)}</span>
+      <span className="text-xs font-semibold text-outline shrink-0 w-14">{time}</span>
+      <span className="flex-1 min-w-0 text-sm text-on-surface truncate">{ev.title}</span>
+      <span className="text-[11px] font-bold text-outline shrink-0">{sourceLabel(ev.source, isAr)}</span>
     </div>
   );
 }

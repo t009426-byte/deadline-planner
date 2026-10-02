@@ -3,11 +3,12 @@
 import { useEffect } from "react";
 import { useLanguage } from "../lib/i18n";
 import { PALETTE, memberLabel, useFamily, type Member } from "../lib/family";
+import CalendarConnections from "./CalendarConnections";
 
 export default function FamilyProfile({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { locale } = useLanguage();
   const isAr = locale === "ar";
-  const { admin, kids, entries, updateMember, addKid, removeMember } = useFamily();
+  const { admin, kids, entries, updateMember, addKid, removeMember, session, signOut } = useFamily();
 
   useEffect(() => {
     if (!open) return;
@@ -88,6 +89,27 @@ export default function FamilyProfile({ open, onClose }: { open: boolean; onClos
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               {isAr ? "إضافة طفل" : "Add child"}
+            </button>
+          </section>
+
+          <section className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-outline">
+              {isAr ? "التقويمات" : "Calendars"}
+            </p>
+            <CalendarConnections />
+          </section>
+
+          <section className="flex items-center justify-between gap-3 pt-2 border-t border-surface-container">
+            <span className="text-xs text-outline truncate">{session?.user.email}</span>
+            <button
+              onClick={() => {
+                onClose();
+                signOut();
+              }}
+              className="shrink-0 flex items-center gap-1 text-sm font-semibold text-on-surface-variant px-3 py-1.5 rounded-lg hover:bg-surface-container"
+            >
+              <span className="material-symbols-outlined text-[18px]">logout</span>
+              {isAr ? "تسجيل الخروج" : "Sign out"}
             </button>
           </section>
         </div>

@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import type { PostgrestError, Session } from "@supabase/supabase-js";
+import { supabase } from "./supabase";
 
 export type EntryType =
   | "assignment"
@@ -48,17 +50,26 @@ export interface Entry {
   done?: boolean;
 }
 
+export interface Task {
+  id: string;
+  label: string;
+  note?: string;
+  done?: boolean;
+}
+
 interface FamilyState {
   members: Member[];
   entries: Entry[];
+  tasks: Task[];
 }
 
-const STORAGE_KEY = "family-hub:v1";
+const LEGACY_STORAGE_KEY = "family-hub:v1";
 
-const DEFAULT_STATE: FamilyState = {
-  members: [{ id: "admin", name: "", color: PALETTE[0], role: "admin" }],
-  entries: [],
-};
+const DEFAULT_TASKS: Omit<Task, "id">[] = [
+  { label: "Study block", note: "9–11 AM" },
+  { label: "Morning mindfulness", note: "10 min" },
+  { label: "Work emails", note: "30 min" },
+];
 
 export function toDateKey(d: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -76,100 +87,264 @@ export function memberLabel(m: Member, isAr: boolean) {
   return isAr ? "طفل" : "Child";
 }
 
-let current: FamilyState | null = null;
-let isNew = false;
-const listeners = new Set<() => void>();
-const SERVER_STATE: FamilyState = DEFAULT_STATE;
+async function fetchFamily(): Promise<FamilyState> {
+  const [m, e, t] = await Promise.all([
+    supabase.from("members").select("id,name,color,role").order("created_at"),
+    supabase.from("entries").select("id,type,date,member_id,title,done").order("created_at"),
+    supabase.from("tasks").select("id,label,note,done").order("created_at"),
+  ]);
+  const error = m.error ?? e.error ?? t.error;
+  if (error) throw error;
+  return {
+    members: (m.data ?? []) as Member[],
+    entries: (e.data ?? []).map((r) => ({
+      id: r.id,
+      type: r.type as EntryType,
+      date: r.date,
+      memberId: r.member_id,
+      title: r.title ?? undefined,
+      done: r.done,
+    })),
+    tasks: (t.data ?? []).map((r) => ({ id: r.id, label: r.label, note: r.note ?? undefined, done: r.done })),
+  };
+}
 
-function load(): FamilyState {
-  if (current) return current;
-  current = { ...DEFAULT_STATE };
-  isNew = true;
+function readLegacyLocal(): Partial<FamilyState> | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as FamilyState;
-      if (Array.isArray(parsed.members) && parsed.members.some((m) => m.role === "admin")) {
-        current = { members: parsed.members, entries: parsed.entries ?? [] };
-        isNew = false;
-      }
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<FamilyState>) : null;
+    return parsed?.members?.some((m) => m.role === "admin") ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// First sign-in: import anything saved in this browser before Supabase, otherwise seed an empty family.
+async function bootstrap(): Promise<{ data: FamilyState; isNew: boolean }> {
+  const existing = await fetchFamily();
+  if (existing.members.some((m) => m.role === "admin")) return { data: existing, isNew: false };
+
+  const local = readLegacyLocal();
+  const idMap = new Map<string, string>();
+  const members = (local?.members ?? [{ id: "admin", name: "", color: PALETTE[0], role: "admin" as const }]).map(
+    (m) => {
+      const id = crypto.randomUUID();
+      idMap.set(m.id, id);
+      return { id, name: m.name, color: m.color, role: m.role };
     }
-  } catch {}
-  return current;
+  );
+  const { error } = await supabase.from("members").insert(members);
+  if (error && error.code !== "23505") throw error;
+  if (!error) {
+    const entries = (local?.entries ?? [])
+      .filter((e) => idMap.has(e.memberId))
+      .map((e) => ({
+        member_id: idMap.get(e.memberId)!,
+        type: e.type,
+        date: e.date,
+        title: e.title ?? null,
+        done: !!e.done,
+      }));
+    const tasks = (local?.tasks ?? DEFAULT_TASKS).map((t) => ({
+      label: t.label,
+      note: t.note ?? null,
+      done: !!t.done,
+    }));
+    const results = await Promise.all([
+      entries.length ? supabase.from("entries").insert(entries) : null,
+      tasks.length ? supabase.from("tasks").insert(tasks) : null,
+    ]);
+    const insertError = results.find((r) => r?.error)?.error;
+    if (insertError) throw insertError;
+    if (local) {
+      try {
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+      } catch {}
+    }
+  }
+  return { data: await fetchFamily(), isNew: !local };
 }
 
-function update(fn: (s: FamilyState) => FamilyState) {
-  current = fn(load());
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
-  } catch {}
-  listeners.forEach((l) => l());
-}
+const bootstraps = new Map<string, ReturnType<typeof bootstrap>>();
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+function bootstrapOnce(userId: string) {
+  let p = bootstraps.get(userId);
+  if (!p) {
+    p = bootstrap().finally(() => bootstraps.delete(userId));
+    bootstraps.set(userId, p);
+  }
+  return p;
 }
 
 type FamilyContextValue = {
+  authReady: boolean;
+  session: Session | null;
+  signOut: () => Promise<void>;
   ready: boolean;
+  loadError: string | null;
+  syncError: string | null;
   isNew: boolean;
   members: Member[];
   admin: Member;
   kids: Member[];
   entries: Entry[];
+  tasks: Task[];
   updateMember: (id: string, patch: Partial<Pick<Member, "name" | "color">>) => void;
   addKid: () => void;
   removeMember: (id: string) => void;
   addEntry: (entry: Omit<Entry, "id">) => void;
   removeEntry: (id: string) => void;
   toggleEntry: (id: string) => void;
+  addTask: (label: string, note?: string) => void;
+  removeTask: (id: string) => void;
+  toggleTask: (id: string) => void;
+  calendarsVersion: number;
+  refreshCalendars: () => void;
 };
+
+const PLACEHOLDER_ADMIN: Member = { id: "", name: "", color: PALETTE[0], role: "admin" };
 
 const FamilyContext = createContext<FamilyContextValue | null>(null);
 
 export function FamilyProvider({ children }: { children: ReactNode }) {
-  const state = useSyncExternalStore(subscribe, load, () => SERVER_STATE);
-  const ready = state !== SERVER_STATE;
-  const setState = update;
+  const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [loaded, setLoaded] = useState<{ userId: string; data: FamilyState; isNew: boolean } | null>(null);
+  const [loadError, setLoadError] = useState<{ userId: string; message: string } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [calendarsVersion, setCalendarsVersion] = useState(0);
+  const nameTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
-  const admin = state.members.find((m) => m.role === "admin")!;
-  const kids = state.members.filter((m) => m.role === "kid");
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      setAuthReady(true);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  const userId = session?.user.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    bootstrapOnce(userId)
+      .then((r) => !cancelled && setLoaded({ userId, ...r }))
+      .catch((err: PostgrestError | Error) => !cancelled && setLoadError({ userId, message: err.message }));
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const current = loaded && loaded.userId === userId ? loaded : null;
+  const data = current?.data ?? null;
+
+  function apply(fn: (s: FamilyState) => FamilyState) {
+    setLoaded((l) => (l ? { ...l, data: fn(l.data) } : l));
+  }
+
+  function remote(op: PromiseLike<{ error: PostgrestError | null }>) {
+    Promise.resolve(op).then(({ error }) => {
+      if (!error) return;
+      setSyncError(error.message);
+      fetchFamily()
+        .then((fresh) => setLoaded((l) => (l && l.userId === userId ? { ...l, data: fresh } : l)))
+        .catch(() => {});
+    });
+  }
+
+  const members = data?.members ?? [];
+  const admin = members.find((m) => m.role === "admin") ?? PLACEHOLDER_ADMIN;
 
   const value: FamilyContextValue = {
-    ready,
-    isNew: ready && isNew,
-    members: state.members,
+    authReady,
+    session,
+    signOut: async () => {
+      await supabase.auth.signOut();
+    },
+    ready: !!data,
+    loadError: loadError && loadError.userId === userId ? loadError.message : null,
+    syncError,
+    isNew: !!current?.isNew,
+    members,
     admin,
-    kids,
-    entries: state.entries,
-    updateMember: (id, patch) =>
-      setState((s) => ({
+    kids: members.filter((m) => m.role === "kid"),
+    entries: data?.entries ?? [],
+    tasks: data?.tasks ?? [],
+
+    updateMember: (id, patch) => {
+      apply((s) => ({ ...s, members: s.members.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
+      if (patch.color) remote(supabase.from("members").update({ color: patch.color }).eq("id", id));
+      if (patch.name !== undefined) {
+        const timers = nameTimers.current;
+        clearTimeout(timers.get(id));
+        timers.set(
+          id,
+          setTimeout(() => remote(supabase.from("members").update({ name: patch.name }).eq("id", id)), 400)
+        );
+      }
+    },
+    addKid: () => {
+      const used = new Set(members.map((m) => m.color));
+      const kid: Member = {
+        id: crypto.randomUUID(),
+        name: "",
+        color: PALETTE.find((c) => !used.has(c)) ?? PALETTE[members.length % PALETTE.length],
+        role: "kid",
+      };
+      apply((s) => ({ ...s, members: [...s.members, kid] }));
+      remote(supabase.from("members").insert(kid));
+    },
+    removeMember: (id) => {
+      apply((s) => ({
         ...s,
-        members: s.members.map((m) => (m.id === id ? { ...m, ...patch } : m)),
-      })),
-    addKid: () =>
-      setState((s) => {
-        const used = new Set(s.members.map((m) => m.color));
-        const color = PALETTE.find((c) => !used.has(c)) ?? PALETTE[s.members.length % PALETTE.length];
-        return {
-          ...s,
-          members: [...s.members, { id: crypto.randomUUID(), name: "", color, role: "kid" }],
-        };
-      }),
-    removeMember: (id) =>
-      setState((s) => ({
         members: s.members.filter((m) => m.id !== id || m.role === "admin"),
         entries: s.entries.filter((e) => e.memberId !== id),
-      })),
-    addEntry: (entry) =>
-      setState((s) => ({ ...s, entries: [...s.entries, { ...entry, id: crypto.randomUUID() }] })),
-    removeEntry: (id) => setState((s) => ({ ...s, entries: s.entries.filter((e) => e.id !== id) })),
-    toggleEntry: (id) =>
-      setState((s) => ({
-        ...s,
-        entries: s.entries.map((e) => (e.id === id ? { ...e, done: !e.done } : e)),
-      })),
+      }));
+      remote(supabase.from("members").delete().eq("id", id).eq("role", "kid"));
+    },
+
+    addEntry: (entry) => {
+      const id = crypto.randomUUID();
+      apply((s) => ({ ...s, entries: [...s.entries, { ...entry, id }] }));
+      remote(
+        supabase.from("entries").insert({
+          id,
+          member_id: entry.memberId,
+          type: entry.type,
+          date: entry.date,
+          title: entry.title ?? null,
+          done: !!entry.done,
+        })
+      );
+    },
+    removeEntry: (id) => {
+      apply((s) => ({ ...s, entries: s.entries.filter((e) => e.id !== id) }));
+      remote(supabase.from("entries").delete().eq("id", id));
+    },
+    toggleEntry: (id) => {
+      const done = !data?.entries.find((e) => e.id === id)?.done;
+      apply((s) => ({ ...s, entries: s.entries.map((e) => (e.id === id ? { ...e, done } : e)) }));
+      remote(supabase.from("entries").update({ done }).eq("id", id));
+    },
+
+    addTask: (label, note) => {
+      const id = crypto.randomUUID();
+      apply((s) => ({ ...s, tasks: [...s.tasks, { id, label, note }] }));
+      remote(supabase.from("tasks").insert({ id, label, note: note ?? null }));
+    },
+    removeTask: (id) => {
+      apply((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
+      remote(supabase.from("tasks").delete().eq("id", id));
+    },
+    toggleTask: (id) => {
+      const done = !data?.tasks.find((t) => t.id === id)?.done;
+      apply((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, done } : t)) }));
+      remote(supabase.from("tasks").update({ done }).eq("id", id));
+    },
+
+    calendarsVersion,
+    refreshCalendars: () => setCalendarsVersion((v) => v + 1),
   };
 
   return <FamilyContext.Provider value={value}>{children}</FamilyContext.Provider>;
