@@ -150,19 +150,11 @@ export default function Wellbeing() {
               {isAr ? "إكمال تسجيل اليوم" : c.submit}
             </button>
           ) : (
-            <div className="flex items-start gap-3 py-1">
-              <span
-                className="material-symbols-outlined text-primary text-[22px] shrink-0 mt-0.5"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                psychology_alt
+            <div className="flex items-center justify-center gap-2 py-1.5 text-sm font-semibold text-primary">
+              <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                check_circle
               </span>
-              <div>
-                <p className="text-xs font-semibold text-primary mb-1">
-                  {isAr ? "رد المدرّب الشخصي" : c.coachTitle}
-                </p>
-                <p className="text-sm text-on-surface-variant leading-relaxed">{c.coachText}</p>
-              </div>
+              {isAr ? "تم حفظ تسجيل اليوم" : "Check-in saved"}
             </div>
           )}
         </div>

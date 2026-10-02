@@ -2,20 +2,13 @@
 
 import { useState } from "react";
 import { useLanguage } from "../lib/i18n";
+import { ENTRY_TYPES, fromDateKey, memberLabel, toDateKey, useFamily } from "../lib/family";
 
 interface Task {
   id: string;
   label: string;
   note?: string;
   urgent?: boolean;
-}
-
-interface KidTask {
-  id: string;
-  name: string;
-  label: string;
-  note?: string;
-  color: string;
 }
 
 const MY_TASKS: Task[] = [
@@ -25,27 +18,32 @@ const MY_TASKS: Task[] = [
   { id: "readings", label: "Research readings", note: "Due this week" },
 ];
 
-const KID_TASKS: KidTask[] = [
-  { id: "oliver", name: "Oliver", label: "Soccer practice", note: "4:00 PM", color: "#005764" },
-  { id: "maya", name: "Maya", label: "Violin lesson", note: "5:00 PM", color: "#8e4e14" },
-  { id: "leo", name: "Leo", label: "Homework review", note: "After school", color: "#8e2e15" },
-];
-
-const WEEKLY: Array<{ label: string; due: string; urgent?: boolean }> = [
-  { label: "Submit literature review", due: "Thu", urgent: true },
-  { label: "Parent-teacher meeting", due: "Fri" },
-  { label: "Grocery + meal prep", due: "Sun" },
-];
+const typeMeta = Object.fromEntries(ENTRY_TYPES.map((t) => [t.id, t]));
 
 export default function Routines() {
   const { locale } = useLanguage();
   const isAr = locale === "ar";
+  const { members, entries, toggleEntry } = useFamily();
 
   const [myDone, setMyDone] = useState<Record<string, boolean>>({});
-  const [kidDone, setKidDone] = useState<Record<string, boolean>>({});
-
   const myCompleted = Object.values(myDone).filter(Boolean).length;
-  const kidCompleted = Object.values(kidDone).filter(Boolean).length;
+
+  const memberById = Object.fromEntries(members.map((m) => [m.id, m]));
+  const todayKey = toDateKey(new Date());
+  const horizon = new Date();
+  horizon.setDate(horizon.getDate() + 7);
+  const horizonKey = toDateKey(horizon);
+  const upcoming = entries
+    .filter((e) => memberById[e.memberId] && e.date >= todayKey && e.date <= horizonKey)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  function dueLabel(key: string) {
+    if (key === todayKey) return isAr ? "اليوم" : "Today";
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (key === toDateKey(tomorrow)) return isAr ? "غداً" : "Tmrw";
+    return fromDateKey(key).toLocaleDateString(isAr ? "ar" : "en", { weekday: "short" });
+  }
 
   return (
     <div className="space-y-4">
@@ -115,97 +113,60 @@ export default function Routines() {
         </ul>
       </div>
 
-      {/* Kids tasks */}
+      {/* Next 7 days from the family calendar */}
       <div className="bg-surface-container-lowest rounded-xl border border-surface-container overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-container">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]" style={{ color: "#8e4e14", fontVariationSettings: "'FILL' 1" }}>
-              family_restroom
+            <span className="material-symbols-outlined text-[18px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
+              event_upcoming
             </span>
             <span className="font-semibold text-sm text-on-surface">
-              {isAr ? "الأطفال" : "Kids"}
+              {isAr ? "الأيام السبعة القادمة" : "Next 7 days"}
             </span>
           </div>
-          <span className="text-xs text-outline">
-            {kidCompleted}/{KID_TASKS.length}
-          </span>
+          <span className="text-xs text-outline">{upcoming.filter((e) => !e.done).length}</span>
         </div>
-        <ul>
-          {KID_TASKS.map((task, i) => {
-            const done = !!kidDone[task.id];
-            return (
-              <li
-                key={task.id}
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-container transition-colors ${
-                  i < KID_TASKS.length - 1 ? "border-b border-surface-container" : ""
-                }`}
-                onClick={() => setKidDone((d) => ({ ...d, [task.id]: !d[task.id] }))}
-              >
-                <button
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                    done ? "border-[color:var(--c)] bg-[color:var(--c)]" : "border-outline-variant"
+        {upcoming.length === 0 ? (
+          <p className="px-4 py-4 text-sm text-outline">
+            {isAr ? "لا شيء بعد — أضيفي من التقويم أعلاه." : "Nothing yet — add items from the calendar above."}
+          </p>
+        ) : (
+          <ul>
+            {upcoming.map((e, i) => {
+              const m = memberById[e.memberId];
+              const t = typeMeta[e.type];
+              return (
+                <li
+                  key={e.id}
+                  onClick={() => toggleEntry(e.id)}
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-container transition-colors ${
+                    i < upcoming.length - 1 ? "border-b border-surface-container" : ""
                   }`}
-                  style={{ "--c": task.color } as React.CSSProperties}
                 >
-                  {done && (
-                    <span className="material-symbols-outlined text-white text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      check
-                    </span>
-                  )}
-                </button>
-                <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                  <span
+                    className="w-5 h-5 rounded border-2 flex items-center justify-center shrink-0"
+                    style={{ borderColor: m.color, backgroundColor: e.done ? m.color : "transparent" }}
+                  >
+                    {e.done && <span className="material-symbols-outlined text-white text-[13px]">check</span>}
+                  </span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-surface-container text-outline shrink-0 w-12 text-center">
+                    {dueLabel(e.date)}
+                  </span>
+                  <span className={`flex-1 min-w-0 text-sm truncate ${e.done ? "line-through text-outline" : "text-on-surface"}`}>
+                    <span className="font-medium">{isAr ? t.ar : t.en}</span>
+                    {e.title && <span className="text-on-surface-variant"> · {e.title}</span>}
+                  </span>
                   <span
                     className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                    style={{ color: task.color, backgroundColor: `${task.color}15` }}
+                    style={{ color: m.color, backgroundColor: `${m.color}1a` }}
                   >
-                    {task.name}
+                    {memberLabel(m, isAr)}
                   </span>
-                  <span className={`text-sm font-medium ${done ? "line-through text-outline" : "text-on-surface"}`}>
-                    {task.label}
-                  </span>
-                  {task.note && (
-                    <span className="text-xs text-outline ms-auto shrink-0">{task.note}</span>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      {/* Weekly upcoming */}
-      <div className="bg-surface-container-lowest rounded-xl border border-surface-container overflow-hidden">
-        <div className="px-4 py-3 border-b border-surface-container">
-          <span className="font-semibold text-sm text-on-surface">
-            {isAr ? "هذا الأسبوع" : "Coming up"}
-          </span>
-        </div>
-        <ul>
-          {WEEKLY.map((item, i) => (
-            <li
-              key={item.label}
-              className={`flex items-center gap-3 px-4 py-3 ${i < WEEKLY.length - 1 ? "border-b border-surface-container" : ""}`}
-            >
-              <span
-                className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${
-                  item.urgent
-                    ? "bg-primary/10 text-primary"
-                    : "bg-surface-container text-outline"
-                }`}
-              >
-                {item.due}
-              </span>
-              <span className={`text-sm ${item.urgent ? "font-semibold text-on-surface" : "text-on-surface-variant"}`}>
-                {item.label}
-              </span>
-              {item.urgent && (
-                <span className="ms-auto material-symbols-outlined text-primary text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  priority_high
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );

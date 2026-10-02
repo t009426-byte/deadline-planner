@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Work_Sans, Tajawal } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "./lib/i18n";
+import { FamilyProvider } from "./lib/family";
 
 const headingFont = Plus_Jakarta_Sans({
   variable: "--font-heading",
@@ -44,7 +45,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-on-background font-body">
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          <FamilyProvider>{children}</FamilyProvider>
+        </LanguageProvider>
       </body>
     </html>
   );
