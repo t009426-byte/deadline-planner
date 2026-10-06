@@ -65,10 +65,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     "X-PUBLISHED-TTL:PT1H",
   ];
   for (const r of rows) {
-    const who = r.member_name?.trim() || (r.member_role === "admin" ? "Mom" : "Child");
+    // The subscriber is the admin, so only kids' entries need a name.
+    const who = r.member_role === "admin" ? "" : r.member_name?.trim() || "Child";
     const type = TYPE_LABELS[r.type] ?? r.type;
     // Phone month views truncate hard, so lead with the most specific text.
-    const summary = `${r.done ? "✓ " : ""}${r.title ? `${r.title} · ${type}` : type} · ${who}`;
+    const summary = `${r.done ? "✓ " : ""}${r.title ? `${r.title} · ${type}` : type}${who ? ` · ${who}` : ""}`;
     lines.push(
       "BEGIN:VEVENT",
       `UID:${r.id}@family-hub`,
@@ -76,7 +77,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
       `DTSTART;VALUE=DATE:${compactDate(r.date)}`,
       `DTEND;VALUE=DATE:${nextDay(r.date)}`,
       fold(`SUMMARY:${escapeText(summary)}`),
-      fold(`DESCRIPTION:${escapeText(`${type} — ${who}`)}`),
+      fold(`DESCRIPTION:${escapeText(who ? `${type} — ${who}` : type)}`),
       "TRANSP:TRANSPARENT",
       "END:VEVENT"
     );
