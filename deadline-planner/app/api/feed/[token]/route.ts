@@ -10,6 +10,7 @@ const TYPE_LABELS: Record<string, string> = {
   appointment: "Appointment",
   quiz: "Quiz",
   test: "Test",
+  college: "College",
 };
 
 function escapeText(s: string) {

@@ -11,7 +11,8 @@ export type EntryType =
   | "meeting"
   | "appointment"
   | "quiz"
-  | "test";
+  | "test"
+  | "college";
 
 export const ENTRY_TYPES: { id: EntryType; icon: string; en: string; ar: string }[] = [
   { id: "assignment", icon: "assignment", en: "Assignment", ar: "تكليف" },
@@ -21,6 +22,7 @@ export const ENTRY_TYPES: { id: EntryType; icon: string; en: string; ar: string 
   { id: "appointment", icon: "event_available", en: "Appointment", ar: "موعد" },
   { id: "quiz", icon: "quiz", en: "Quiz", ar: "اختبار قصير" },
   { id: "test", icon: "fact_check", en: "Test", ar: "امتحان" },
+  { id: "college", icon: "school", en: "College", ar: "الجامعة" },
 ];
 
 export const PALETTE = [
