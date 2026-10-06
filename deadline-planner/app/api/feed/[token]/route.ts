@@ -66,7 +66,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   ];
   for (const r of rows) {
     const who = r.member_name?.trim() || (r.member_role === "admin" ? "Mom" : "Child");
-    const summary = `${r.done ? "✓ " : ""}${who} · ${TYPE_LABELS[r.type] ?? r.type}${r.title ? ` — ${r.title}` : ""}`;
+    const type = TYPE_LABELS[r.type] ?? r.type;
+    // Phone month views truncate hard, so lead with the most specific text.
+    const summary = `${r.done ? "✓ " : ""}${r.title ? `${r.title} · ${type}` : type} · ${who}`;
     lines.push(
       "BEGIN:VEVENT",
       `UID:${r.id}@family-hub`,
@@ -74,6 +76,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
       `DTSTART;VALUE=DATE:${compactDate(r.date)}`,
       `DTEND;VALUE=DATE:${nextDay(r.date)}`,
       fold(`SUMMARY:${escapeText(summary)}`),
+      fold(`DESCRIPTION:${escapeText(`${type} — ${who}`)}`),
       "TRANSP:TRANSPARENT",
       "END:VEVENT"
     );
